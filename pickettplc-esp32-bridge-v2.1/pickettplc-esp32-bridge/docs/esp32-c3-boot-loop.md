@@ -38,25 +38,28 @@ Download firmware v2.2 from this repository and upload it. It picks the right pi
   // ESP32-C3. GPIO 12-17 run the flash chip: never use them.
   const char* BOARD_NAME = "ESP32-C3";
   #if ARDUINO_USB_CDC_ON_BOOT
-    const int IN_PINS[8]  = { 2, 8, 9, 20, 21, -1, -1, -1 };
+    const int IN_PINS[8]  = { 9, 2, 20, 21, -1, -1, -1, -1 };
   #else
-    const int IN_PINS[8]  = { 2, 8, 9, -1, -1, -1, -1, -1 };
+    const int IN_PINS[8]  = { 9, 2, -1, -1, -1, -1, -1, -1 };
   #endif
-  const int OUT_PINS[8]  = { 0, 1, 3, 4, 5, 6, 7, 10 };
-  const int ONBOARD_LED  = -1;
+  const int OUT_PINS[8]    = { 0, 1, 3, 4, 5, 6, 7, 10 };
+  const int ONBOARD_LED    = 8;     // SuperMini blue LED
+  const int ONBOARD_LED_ON = LOW;   // it lights when the pin is LOW
 
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
   const char* BOARD_NAME = "ESP32-S3";
   const int IN_PINS[8]   = { 4, 5, 6, 7, 15, 16, 17, 18 };
   const int OUT_PINS[8]  = { 8, 9, 10, 11, 12, 13, 14, 21 };
-  const int ONBOARD_LED  = -1;
+  const int ONBOARD_LED    = -1;
+  const int ONBOARD_LED_ON = HIGH;
 
 #else
   // Classic ESP32 DevKit: unchanged from v2.1
   const char* BOARD_NAME = "ESP32";
   const int IN_PINS[8]   = { 13, 14, 27, 26, 25, 33, 32, 4 };
   const int OUT_PINS[8]  = { 23, 22, 21, 19, 18, 17, 16, 15 };
-  const int ONBOARD_LED  = 2;
+  const int ONBOARD_LED    = 2;
+  const int ONBOARD_LED_ON = HIGH;
 #endif
 ```
 `-1` means "no pin here". v2.2 skips those addresses everywhere a pin is touched, so an unused input always reads 0 and an unused output is ignored:
@@ -75,9 +78,9 @@ The `hello` reply now also says which pin map was built in, so you can check it 
 {"hello":"PickettPLC-ESP32","fw":"2.2","board":"ESP32-C3","inputs":8,"outputs":8}
 ```
 ESP32-C3 wiring (v2.2)
-The C3 has far fewer GPIOs than a classic ESP32, so it gets 8 outputs and up to 5 inputs.
+The C3 has far fewer GPIOs than a classic ESP32, so it gets 8 outputs and up to 4 inputs. Two things work with no wiring at all on a C3 SuperMini: the blue on-board LED copies Q0.0, and the BOOT button is I0.0.
 PickettPLC	C3 GPIO	Notes
-Q0.0	0	
+Q0.0	0	also lights the on-board LED (GPIO 8)
 Q0.1	1	
 Q0.2	3	
 Q0.3	4	
@@ -85,13 +88,14 @@ Q0.4	5
 Q0.5	6	
 Q0.6	7	
 Q0.7	10	
-I0.0	2	boot pin: don't hold this button down while powering up
-I0.1	8	boot pin; also the on-board LED on SuperMini boards
-I0.2	9	boot pin; also the BOOT button, so the BOOT button works as I0.2
-I0.3	20	only with USB CDC On Boot: Enabled
-I0.4	21	only with USB CDC On Boot: Enabled
-I0.5 – I0.7	—	not available on the C3
-Why the boot pins are inputs and not outputs: GPIO 2, 8 and 9 decide how the C3 starts up. An LED and resistor to GND on one of them can pull it low at power-up and stop the board from booting. A push-button to GND is fine as long as it isn't pressed during power-up.
+I0.0	9	the BOOT button; don't hold it while powering up
+I0.1	2	boot pin: don't hold this button down while powering up
+I0.2	20	only with USB CDC On Boot: Enabled
+I0.3	21	only with USB CDC On Boot: Enabled
+I0.4 – I0.7	—	not available on the C3
+Quick test with nothing wired: upload v2.2, connect PickettPLC, press 💡 BLINK TEST then ▶ RUN, and the blue LED flashes once a second. Press BOOT and I0.0 lights in the I/O table.
+The on-board LED is on GPIO 8 and is wired to 3.3 V, so it lights when the pin is LOW. v2.2 handles that with `ONBOARD_LED_ON = LOW`; set `ONBOARD_LED` to `-1` if your board has no LED there.
+Why the boot pins (2, 8, 9) never drive an external LED: they decide how the C3 starts up. An LED and resistor to GND on one of them can pull it low at power-up and stop the board from booting. A push-button to GND is fine as long as it isn't pressed during power-up.
 Why GPIO 18 and 19 are not used: they are the USB data lines on the C3.
 Wiring is the same as on the classic board. Buttons go between the pin and GND (the firmware uses the internal pull-up). LEDs go pin → 330 Ω resistor → LED → GND. For relays, use a relay module with its own driver, never a bare relay coil.
 Arduino IDE settings for the C3
