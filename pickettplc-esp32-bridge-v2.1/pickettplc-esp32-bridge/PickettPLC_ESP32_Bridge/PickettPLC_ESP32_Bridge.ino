@@ -17,7 +17,7 @@
  *
  * BOARD (picked automatically from Tools > Board in the Arduino IDE)
  *   ESP32 (classic DevKit, WROOM-32)  8 inputs / 8 outputs
- *   ESP32-C3 (DevKitM-1, SuperMini)   5 inputs / 8 outputs
+ *   ESP32-C3 (SuperMini, DevKitM-1)   4 inputs / 8 outputs
  *   ESP32-S3 (DevKitC-1)              8 inputs / 8 outputs
  *   Each chip has different pins. Using the wrong list can make the board
  *   reboot forever (see docs/esp32-c3-boot-loop.md), so leave the lists
@@ -57,17 +57,20 @@ const char* FW_VERSION = "2.2";
 #if defined(CONFIG_IDF_TARGET_ESP32C3)
   // ESP32-C3. GPIO 12-17 run the flash chip: never use them.
   // GPIO 18/19 are the USB data lines. GPIO 2, 8 and 9 are boot (strapping)
-  // pins, so they are inputs here: an LED to GND on them can stop the boot.
+  // pins, so none of them drive an LED to GND here: that can stop the boot.
+  // I0.0 is GPIO 9, the BOOT button on most C3 boards: an input with no wiring.
+  // On the C3 SuperMini the blue on-board LED is GPIO 8 and lights when LOW.
   const char* BOARD_NAME = "ESP32-C3";
   #if ARDUINO_USB_CDC_ON_BOOT
     // Native USB: GPIO 20/21 (UART0) are free
-    const int IN_PINS[8]  = { 2, 8, 9, 20, 21, -1, -1, -1 };
+    const int IN_PINS[8]  = { 9, 2, 20, 21, -1, -1, -1, -1 };
   #else
     // USB-serial chip on UART0: GPIO 20/21 carry Serial, so leave them alone
-    const int IN_PINS[8]  = { 2, 8, 9, -1, -1, -1, -1, -1 };
+    const int IN_PINS[8]  = { 9, 2, -1, -1, -1, -1, -1, -1 };
   #endif
   const int OUT_PINS[8]  = { 0, 1, 3, 4, 5, 6, 7, 10 };
-  const int ONBOARD_LED  = -1;   // SuperMini LED is GPIO 8, used as an input above
+  const int ONBOARD_LED    = 8;     // SuperMini blue LED. Set to -1 to turn this off.
+  const int ONBOARD_LED_ON = LOW;   // SuperMini LED is wired to 3.3 V: LOW = on
 
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
   // ESP32-S3. GPIO 26-32 run the flash (33-37 too on octal-PSRAM modules).
@@ -75,7 +78,8 @@ const char* FW_VERSION = "2.2";
   const char* BOARD_NAME = "ESP32-S3";
   const int IN_PINS[8]   = { 4, 5, 6, 7, 15, 16, 17, 18 };
   const int OUT_PINS[8]  = { 8, 9, 10, 11, 12, 13, 14, 21 };
-  const int ONBOARD_LED  = -1;   // S3 DevKit LED is an addressable RGB LED
+  const int ONBOARD_LED    = -1;  // S3 DevKit LED is an addressable RGB LED
+  const int ONBOARD_LED_ON = HIGH;
 
 #else
   // Classic ESP32 DevKit (ESP32-WROOM-32).
@@ -86,7 +90,8 @@ const char* FW_VERSION = "2.2";
   const int OUT_PINS[8]  = { 23, 22, 21, 19, 18, 17, 16, 15 };
   // The on-board LED (GPIO 2 on most DevKits) copies Q0.0, so the Blink Test
   // works with no wiring at all. Set to -1 to turn this off.
-  const int ONBOARD_LED  = 2;
+  const int ONBOARD_LED    = 2;
+  const int ONBOARD_LED_ON = HIGH;
 #endif
 
 const char* IN_ADDR[8] = { "I0.0", "I0.1", "I0.2", "I0.3", "I0.4", "I0.5", "I0.6", "I0.7" };
@@ -103,7 +108,8 @@ String serialLine;
 void setOutput(int i, bool on) {
   outState[i] = on;
   if (OUT_PINS[i] >= 0) digitalWrite(OUT_PINS[i], on ? HIGH : LOW);
-  if (i == 0 && ONBOARD_LED >= 0) digitalWrite(ONBOARD_LED, on ? HIGH : LOW);
+  if (i == 0 && ONBOARD_LED >= 0)
+    digitalWrite(ONBOARD_LED, on ? ONBOARD_LED_ON : !ONBOARD_LED_ON);
 }
 
 void allOutputsOff() {
@@ -223,9 +229,3 @@ void loop() {
 #endif
   }
 
-  // Safety: browser gone quiet -> outputs off
-  if (lastRx != 0 && now - lastRx > LINK_TIMEOUT_MS) {
-    allOutputsOff();
-    lastRx = 0;
-  }
-}
